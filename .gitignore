@@ -1,0 +1,25 @@
+# Dependencias
+node_modules/
+
+# Entorno
+.env
+.env.local
+
+# Build y distribución
+.next/
+dist/
+build/
+out/
+
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Tests
+coverage/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
