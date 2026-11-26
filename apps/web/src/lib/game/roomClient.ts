@@ -25,8 +25,20 @@ async function request<T = AnyObject>(url: string, body?: unknown): Promise<T | 
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error ?? `Error ${res.status}`);
+  const raw = await res.text();
+  let data: Record<string, unknown> | null = null;
+  try {
+    data = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const message =
+      (typeof data?.error === "string" ? data.error : null) ??
+      (raw ? raw.slice(0, 200) : `Error ${res.status}`);
+    const detail = typeof data?.detail === "string" ? data.detail : null;
+    throw new Error(detail ? `${message}: ${detail}` : message);
+  }
   return data as T;
 }
 

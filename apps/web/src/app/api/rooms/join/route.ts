@@ -9,12 +9,23 @@ import {
   ok,
   parseJson,
   requireUser,
+  serverError,
   unauthorized,
 } from "@/lib/api/utils";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  let admin;
+  try {
+    admin = getAdminClient();
+  } catch (e) {
+    return serverError(
+      "Configuración del servidor incompleta",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
   const user = await requireUser(request);
   if (!user) return unauthorized();
 
@@ -43,11 +54,12 @@ export async function POST(request: NextRequest) {
     .eq("user_id", user.id)
     .single();
   if (existing) {
-    await getAdminClient()
+    const { error: reconnectError } = await admin
       .from("room_players")
       .update({ is_connected: true })
       .eq("room_id", roomRow.id)
       .eq("user_id", user.id);
+    if (reconnectError) return serverError("Error al reconectar", reconnectError.message);
     return ok({ room: roomRow, joined: true, reconnected: true });
   }
 
@@ -60,13 +72,13 @@ export async function POST(request: NextRequest) {
     return conflict("La sala está llena (máximo 8 jugadores)");
   }
 
-  const { data: player, error: insertError } = await getAdminClient()
+  const { data: player, error: insertError } = await admin
     .from("room_players")
     .insert({ room_id: roomRow.id, user_id: user.id, seat_index: seat, is_ready: false, is_connected: true })
     .select("*")
     .single();
   if (insertError) {
-    return conflict("No se pudo unir a la sala");
+    return serverError("No se pudo unir a la sala", insertError.message);
   }
 
   return ok({ room: roomRow, joined: true, seatIndex: player?.seat_index ?? seat });

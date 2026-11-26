@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
+import type { CookieOptions } from "@supabase/ssr";
 
 /**
- * Cliente de Supabase para el servidor (Route Handlers).
- * La sesión se lee de la cabecera `cookie` de la petición entrante; así se
- * valida la identidad del usuario en cada llamada sin depender de caché global.
+ * Cliente de Supabase para Route Handlers. Lee la sesión de las cookies de la
+ * petición; `setAll` mantiene cualquier refresco dentro de la petición (el
+ * middleware se encarga de propagar las cookies refrescadas a la respuesta).
  */
 export function getSupabaseServerClient(request: Request) {
   const cookiesFromHeader = request.headers.get("cookie");
@@ -24,6 +25,12 @@ export function getSupabaseServerClient(request: Request) {
     {
       cookies: {
         getAll: () => [...cookies].map(([name, value]) => ({ name, value })),
+        setAll: (all: { name: string; value: string; options?: CookieOptions }[]) => {
+          for (const { name, value } of all) {
+            if (value === "") cookies.delete(name);
+            else cookies.set(name, value);
+          }
+        },
       },
     },
   );

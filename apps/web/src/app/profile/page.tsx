@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { ProfileRow } from "@silhouette/shared-types";
 import { DEFAULT_AVATAR_CONFIG } from "@silhouette/shared-types";
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -12,6 +13,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [username, setUsername] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [linkEmail, setLinkEmail] = useState("");
+  const [linkPassword, setLinkPassword] = useState("");
+  const [linkMsg, setLinkMsg] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -45,6 +50,40 @@ export default function ProfilePage() {
     setProfile((p) => (p ? { ...p, avatar_config: avatarConfig } : p));
   };
 
+  /** Convierte la cuenta de invitado en permanente conservando perfil y puntos. */
+  const claimAccount = async () => {
+    setLinkMsg(null);
+    if (!linkEmail.includes("@") || linkPassword.length < 6) {
+      setLinkMsg("Introduce un correo válido y una contraseña de 6+ caracteres");
+      return;
+    }
+    setLinking(true);
+    try {
+      const { error } = await getSupabaseClient().auth.updateUser({
+        email: linkEmail.trim(),
+        password: linkPassword,
+      });
+      if (error) setLinkMsg(error.message);
+      else {
+        setLinkMsg("¡Listo! Ya puedes iniciar sesión con este correo desde cualquier dispositivo.");
+        setProfile((p) => (p ? { ...p, is_guest: false } : p));
+      }
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  if (!profile) {
+    return (
+      <main className="min-h-screen p-6 flex flex-col items-center justify-center gap-4">
+        <p className="text-violet-300">Todavía no tienes perfil.</p>
+        <Link href="/" className="btn-primary">
+          Jugar como invitado o iniciar sesión
+        </Link>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen p-6 max-w-2xl mx-auto flex flex-col gap-8">
       <h1 className="text-3xl font-bold text-violet-100">Mi perfil</h1>
@@ -72,6 +111,36 @@ export default function ProfilePage() {
           </div>
         </dl>
       </div>
+
+      {profile.is_guest && (
+        <section className="max-w-md bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-violet-100">Guardar mi progreso</h2>
+            <p className="text-xs text-violet-300">
+              Estás jugando como invitado. Vincula un correo y contraseña para conservar tus puntos
+              y tu avatar sin perder esta partida.
+            </p>
+          </div>
+          <input
+            className="input-field"
+            type="email"
+            placeholder="Correo electrónico"
+            value={linkEmail}
+            onChange={(e) => setLinkEmail(e.target.value)}
+          />
+          <input
+            className="input-field"
+            type="password"
+            placeholder="Contraseña (6+ caracteres)"
+            value={linkPassword}
+            onChange={(e) => setLinkPassword(e.target.value)}
+          />
+          <button className="btn-primary self-start" disabled={linking} onClick={() => void claimAccount()}>
+            {linking ? "Vinculando..." : "Vincular correo a mi cuenta"}
+          </button>
+          {linkMsg && <p className="text-sm text-violet-300">{linkMsg}</p>}
+        </section>
+      )}
     </main>
   );
 }

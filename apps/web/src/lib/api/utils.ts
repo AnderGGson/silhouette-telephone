@@ -45,6 +45,16 @@ export function conflict(message: string): Response {
   return NextResponse.json({ error: message }, { status: 409 });
 }
 
+/**
+ * Error 500 con detalle: registra la causa en los logs de Vercel y la devuelve
+ * al cliente para que el 500 deje de ser un misterio.
+ */
+export function serverError(message: string, detail?: string | null): Response {
+  const clean = detail ? String(detail).slice(0, 800) : null;
+  console.error(`[api] ${message}`, clean ?? "");
+  return NextResponse.json({ error: message, detail: clean }, { status: 500 });
+}
+
 export async function parseJson<T = Record<string, unknown>>(
   request: Request,
 ): Promise<T | null> {

@@ -1,38 +1,37 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse } from "next/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Actualiza la sesión de Supabase por middleware (refresh de cookies).
- * Se ejecuta en cada petición para mantener la sesión activa.
+ * Refresca la sesión de Supabase en cada petición usando el patrón oficial
+ * de SSR: `setAll` escribe las cookies nuevas en la respuesta **y** en los
+ * headers del request para que los Route Handlers vean el token refrescado.
  */
-export async function updateSession(request: Request): Promise<Response> {
-  const cookiesFromHeader = request.headers.get("cookie");
-  const cookies = new Map<string, string>();
-  if (cookiesFromHeader) {
-    for (const part of cookiesFromHeader.split(";")) {
-      const idx = part.indexOf("=");
-      if (idx > -1) {
-        const name = part.slice(0, idx).trim();
-        if (name) cookies.set(name, part.slice(idx + 1).trim());
-      }
-    }
-  }
+export async function updateSession(request: NextRequest) {
+  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => [...cookies].map(([name, value]) => ({ name, value })),
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
+          for (const { name, value } of cookiesToSet) {
+            request.cookies.set(name, value);
+          }
+          response = NextResponse.next({ request });
+          for (const { name, value, options } of cookiesToSet) {
+            response.cookies.set(name, value, options);
+          }
+        },
       },
     },
   );
 
-  try {
-    await supabase.auth.getSession();
-  } catch {
-    // La sesión no está disponible; proseguimos sin cambios.
-  }
+  // getUser() valida el JWT y dispara el refresh cuando hace falta.
+  await supabase.auth.getUser();
 
-  return NextResponse.next();
+  return response;
 }

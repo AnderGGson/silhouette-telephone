@@ -5,15 +5,21 @@ type BrowserClient = SupabaseClient<any, any>;
 
 let cachedClient: BrowserClient | null = null;
 
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Falta la variable de entorno ${name}`);
+  return value;
+}
+
 /**
- * Cliente de Supabase para el navegador (Fase 3 / configuración inicial).
- * Las políticas RLS de PostgREST aplican aquí.
+ * Cliente de Supabase para el navegador. RLS de PostgREST aplica aquí.
+ * Lazy: no se crea durante el prerender del build de Next.js.
  */
 export function getSupabaseClient(): BrowserClient {
   if (!cachedClient) {
     cachedClient = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      requiredEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      requiredEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     );
   }
   return cachedClient;
